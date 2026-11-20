@@ -6,5 +6,6 @@ import tn.pharmaciesdegarde.api.entity.Pharmacie
 interface PharmacieRepository : JpaRepository<Pharmacie, Long> {
     fun findByVille(ville: String): List<Pharmacie>
     fun existsByNomIgnoreCaseAndAdresseIgnoreCase(nom: String, adresse: String): Boolean
+    fun existsByNomIgnoreCaseAndAdresseIgnoreCaseAndIdNot(nom: String, adresse: String, id: Long): Boolean
 
 }

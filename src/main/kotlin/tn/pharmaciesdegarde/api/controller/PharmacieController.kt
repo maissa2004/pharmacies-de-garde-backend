@@ -13,6 +13,11 @@ import org.springframework.http.MediaType
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.RequestBody
 import tn.pharmaciesdegarde.api.dto.PharmacieRequest
+import org.springframework.web.bind.annotation.DeleteMapping
+import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PutMapping
+import tn.pharmaciesdegarde.api.dto.PharmacieUpdateRequest
+
 
 @RestController
 @RequestMapping("/api")
@@ -97,5 +102,43 @@ class PharmacieController(
             )
         )
         return ResponseEntity.status(HttpStatus.CREATED).body(saved)
+    }
+
+
+    @PutMapping("/admin/pharmacies/{id}")
+    fun update(@PathVariable id: Long, @RequestBody r: PharmacieUpdateRequest): ResponseEntity<Any> {
+        val pharmacie = pharmacieRepository.findById(id).orElse(null)
+            ?: return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(mapOf("message" to "Pharmacie introuvable"))
+
+        val nom = r.nom.trim()
+        val adresse = r.adresse.trim()
+        val telephone = r.telephone.trim()
+
+        if (nom.isBlank() || adresse.isBlank() || telephone.isBlank())
+            return ResponseEntity.badRequest()
+                .body(mapOf("message" to "Tous les champs sont obligatoires"))
+
+        if (!telephone.matches(Regex("^(\\+216)?[0-9 ]{8,12}$")))
+            return ResponseEntity.badRequest()
+                .body(mapOf("message" to "Numéro de téléphone invalide"))
+
+        if (pharmacieRepository.existsByNomIgnoreCaseAndAdresseIgnoreCaseAndIdNot(nom, adresse, id))
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(mapOf("message" to "Cette pharmacie existe déjà"))
+
+        pharmacie.nom = nom
+        pharmacie.adresse = adresse
+        pharmacie.telephone = telephone
+        return ResponseEntity.ok(pharmacieRepository.save(pharmacie))
+    }
+
+    @DeleteMapping("/admin/pharmacies/{id}")
+    fun delete(@PathVariable id: Long): ResponseEntity<Any> {
+        if (!pharmacieRepository.existsById(id))
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(mapOf("message" to "Pharmacie introuvable"))
+        pharmacieRepository.deleteById(id)
+        return ResponseEntity.noContent().build()
     }
 }
