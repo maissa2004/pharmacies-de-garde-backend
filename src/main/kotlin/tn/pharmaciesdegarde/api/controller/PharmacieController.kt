@@ -10,6 +10,9 @@ import org.springframework.web.multipart.MultipartFile
 import tn.pharmaciesdegarde.api.entity.Pharmacie
 import tn.pharmaciesdegarde.api.repository.PharmacieRepository
 import org.springframework.http.MediaType
+import org.springframework.http.HttpStatus
+import org.springframework.web.bind.annotation.RequestBody
+import tn.pharmaciesdegarde.api.dto.PharmacieRequest
 
 @RestController
 @RequestMapping("/api")
@@ -54,5 +57,45 @@ class PharmacieController(
             }
         }
         return ResponseEntity.ok(mapOf("inserted" to inserted))
+    }
+
+    @PostMapping("/admin/pharmacies")
+    fun create(@RequestBody r: PharmacieRequest): ResponseEntity<Any> {
+        val nom = r.nom.trim()
+        val adresse = r.adresse.trim()
+        val ville = r.ville.trim()
+        val gouvernorat = r.gouvernorat.trim()
+        val telephone = r.telephone.trim()
+
+        if (nom.isBlank() || adresse.isBlank() || ville.isBlank() ||
+            gouvernorat.isBlank() || telephone.isBlank()
+        ) return ResponseEntity.badRequest()
+            .body(mapOf("message" to "Tous les champs sont obligatoires"))
+
+        if (r.latitude !in -90.0..90.0 || r.longitude !in -180.0..180.0)
+            return ResponseEntity.badRequest()
+                .body(mapOf("message" to "Coordonnées GPS invalides"))
+
+        if (!telephone.matches(Regex("^(\\+216)?[0-9 ]{8,12}$")))
+            return ResponseEntity.badRequest()
+                .body(mapOf("message" to "Numéro de téléphone invalide"))
+
+        if (pharmacieRepository.existsByNomIgnoreCaseAndAdresseIgnoreCase(nom, adresse))
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(mapOf("message" to "Cette pharmacie existe déjà"))
+
+        val saved = pharmacieRepository.save(
+            Pharmacie(
+                nom = nom,
+                adresse = adresse,
+                ville = ville,
+                gouvernorat = gouvernorat,
+                latitude = r.latitude,
+                longitude = r.longitude,
+                telephone = telephone,
+                photo = r.photo?.trim()?.ifBlank { null }
+            )
+        )
+        return ResponseEntity.status(HttpStatus.CREATED).body(saved)
     }
 }
