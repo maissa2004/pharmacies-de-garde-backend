@@ -77,9 +77,10 @@ class PharmacieController(
         ) return ResponseEntity.badRequest()
             .body(mapOf("message" to "Tous les champs sont obligatoires"))
 
-        if (r.latitude !in -90.0..90.0 || r.longitude !in -180.0..180.0)
+        // Tunisie : latitude ≈ 30–38, longitude ≈ 7–12
+        if (r.latitude !in 30.0..38.0 || r.longitude !in 7.0..12.0)
             return ResponseEntity.badRequest()
-                .body(mapOf("message" to "Coordonnées GPS invalides"))
+                .body(mapOf("message" to "Position invalide : elle doit se trouver en Tunisie"))
 
         if (!telephone.matches(Regex("^(\\+216)?[0-9 ]{8,12}$")))
             return ResponseEntity.badRequest()

@@ -4,9 +4,9 @@ data class PharmacieRequest(
     val nom: String,
     val adresse: String,
     val telephone: String,
-    val ville: String = "Non renseignée",
-    val gouvernorat: String = "Non renseigné",
-    val latitude: Double = 0.0,
-    val longitude: Double = 0.0,
+    val ville: String,
+    val gouvernorat: String,
+    val latitude: Double,     // plus de valeur par défaut
+    val longitude: Double,
     val photo: String? = null
 )
