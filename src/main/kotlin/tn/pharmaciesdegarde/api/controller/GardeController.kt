@@ -7,6 +7,7 @@ import tn.pharmaciesdegarde.api.dto.GardeRequest
 import tn.pharmaciesdegarde.api.entity.Garde
 import tn.pharmaciesdegarde.api.repository.GardeRepository
 import tn.pharmaciesdegarde.api.repository.PharmacieRepository
+import tn.pharmaciesdegarde.api.service.GardeRules
 
 @RestController
 @RequestMapping("/api")
@@ -16,8 +17,9 @@ class GardeController(
 ) {
     // Planning d'une région
     @GetMapping("/gardes")
-    fun getGardes(@RequestParam gouvernorat: String): List<Garde> =
-        gardeRepository.findByPharmacieGouvernoratIgnoreCaseOrderByDateDebut(gouvernorat.trim())
+    fun getGardes(@RequestParam(required = false) gouvernorat: String?): List<Garde> =
+        if (gouvernorat.isNullOrBlank()) gardeRepository.findAllByOrderByDateDebut()
+        else gardeRepository.findByPharmacieGouvernoratIgnoreCaseOrderByDateDebut(gouvernorat.trim())
 
     @PostMapping("/admin/gardes")
     fun create(@RequestBody r: GardeRequest): ResponseEntity<Any> {
@@ -32,6 +34,10 @@ class GardeController(
         if (!r.dateFin.isAfter(r.dateDebut))
             return ResponseEntity.badRequest()
                 .body(mapOf("message" to "La date de fin doit être postérieure à la date de début"))
+
+        GardeRules.validate(r.type, r.dateDebut, r.dateFin)?.let { message ->
+            return ResponseEntity.badRequest().body(mapOf("message" to message))
+        }
 
         if (gardeRepository.existsByPharmacieIdAndDateDebutLessThanAndDateFinGreaterThan(
                 pharmacie.id!!, r.dateFin, r.dateDebut))

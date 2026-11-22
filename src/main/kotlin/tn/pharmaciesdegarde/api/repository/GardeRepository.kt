@@ -11,4 +11,6 @@ interface GardeRepository : JpaRepository<Garde, Long> {
     fun existsByPharmacieIdAndDateDebutLessThanAndDateFinGreaterThan(
         pharmacieId: Long, fin: LocalDateTime, debut: LocalDateTime
     ): Boolean
+
+    fun findAllByOrderByDateDebut(): List<Garde>
 }
