@@ -115,14 +115,29 @@ class PharmacieController(
         val nom = r.nom.trim()
         val adresse = r.adresse.trim()
         val telephone = r.telephone.trim()
+        val ville = r.ville?.trim()
+        val gouvernorat = r.gouvernorat?.trim()
+        val lat = r.latitude
+        val lng = r.longitude
 
-        if (nom.isBlank() || adresse.isBlank() || telephone.isBlank())
-            return ResponseEntity.badRequest()
-                .body(mapOf("message" to "Tous les champs sont obligatoires"))
+        if (nom.isBlank() || adresse.isBlank() || telephone.isBlank() ||
+            ville?.isBlank() == true || gouvernorat?.isBlank() == true
+        ) return ResponseEntity.badRequest()
+            .body(mapOf("message" to "Tous les champs sont obligatoires"))
 
         if (!telephone.matches(Regex("^(\\+216)?[0-9 ]{8,12}$")))
             return ResponseEntity.badRequest()
                 .body(mapOf("message" to "Numéro de téléphone invalide"))
+
+        // La position se change toujours en entier : latitude ET longitude
+        if ((lat == null) != (lng == null))
+            return ResponseEntity.badRequest()
+                .body(mapOf("message" to "La latitude et la longitude vont ensemble"))
+
+        // Tunisie : latitude ≈ 30–38, longitude ≈ 7–12
+        if (lat != null && lng != null && (lat !in 30.0..38.0 || lng !in 7.0..12.0))
+            return ResponseEntity.badRequest()
+                .body(mapOf("message" to "Position invalide : elle doit se trouver en Tunisie"))
 
         if (pharmacieRepository.existsByNomIgnoreCaseAndAdresseIgnoreCaseAndIdNot(nom, adresse, id))
             return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -131,6 +146,12 @@ class PharmacieController(
         pharmacie.nom = nom
         pharmacie.adresse = adresse
         pharmacie.telephone = telephone
+        if (ville != null) pharmacie.ville = ville
+        if (gouvernorat != null) pharmacie.gouvernorat = gouvernorat
+        if (lat != null && lng != null) {
+            pharmacie.latitude = lat
+            pharmacie.longitude = lng
+        }
         return ResponseEntity.ok(pharmacieRepository.save(pharmacie))
     }
 
