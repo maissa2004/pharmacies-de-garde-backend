@@ -10,6 +10,14 @@ import org.springframework.web.multipart.MultipartFile
 import tn.pharmaciesdegarde.api.entity.Pharmacie
 import tn.pharmaciesdegarde.api.repository.PharmacieRepository
 import org.springframework.http.MediaType
+import org.springframework.http.HttpStatus
+import org.springframework.web.bind.annotation.RequestBody
+import tn.pharmaciesdegarde.api.dto.PharmacieRequest
+import org.springframework.web.bind.annotation.DeleteMapping
+import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PutMapping
+import tn.pharmaciesdegarde.api.dto.PharmacieUpdateRequest
+
 
 @RestController
 @RequestMapping("/api")
@@ -54,5 +62,105 @@ class PharmacieController(
             }
         }
         return ResponseEntity.ok(mapOf("inserted" to inserted))
+    }
+
+    @PostMapping("/admin/pharmacies")
+    fun create(@RequestBody r: PharmacieRequest): ResponseEntity<Any> {
+        val nom = r.nom.trim()
+        val adresse = r.adresse.trim()
+        val ville = r.ville.trim()
+        val gouvernorat = r.gouvernorat.trim()
+        val telephone = r.telephone.trim()
+
+        if (nom.isBlank() || adresse.isBlank() || ville.isBlank() ||
+            gouvernorat.isBlank() || telephone.isBlank()
+        ) return ResponseEntity.badRequest()
+            .body(mapOf("message" to "Tous les champs sont obligatoires"))
+
+        // Tunisie : latitude ≈ 30–38, longitude ≈ 7–12
+        if (r.latitude !in 30.0..38.0 || r.longitude !in 7.0..12.0)
+            return ResponseEntity.badRequest()
+                .body(mapOf("message" to "Position invalide : elle doit se trouver en Tunisie"))
+
+        if (!telephone.matches(Regex("^(\\+216)?[0-9 ]{8,12}$")))
+            return ResponseEntity.badRequest()
+                .body(mapOf("message" to "Numéro de téléphone invalide"))
+
+        if (pharmacieRepository.existsByNomIgnoreCaseAndAdresseIgnoreCase(nom, adresse))
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(mapOf("message" to "Cette pharmacie existe déjà"))
+
+        val saved = pharmacieRepository.save(
+            Pharmacie(
+                nom = nom,
+                adresse = adresse,
+                ville = ville,
+                gouvernorat = gouvernorat,
+                latitude = r.latitude,
+                longitude = r.longitude,
+                telephone = telephone,
+                photo = r.photo?.trim()?.ifBlank { null }
+            )
+        )
+        return ResponseEntity.status(HttpStatus.CREATED).body(saved)
+    }
+
+
+    @PutMapping("/admin/pharmacies/{id}")
+    fun update(@PathVariable id: Long, @RequestBody r: PharmacieUpdateRequest): ResponseEntity<Any> {
+        val pharmacie = pharmacieRepository.findById(id).orElse(null)
+            ?: return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(mapOf("message" to "Pharmacie introuvable"))
+
+        val nom = r.nom.trim()
+        val adresse = r.adresse.trim()
+        val telephone = r.telephone.trim()
+        val ville = r.ville?.trim()
+        val gouvernorat = r.gouvernorat?.trim()
+        val lat = r.latitude
+        val lng = r.longitude
+
+        if (nom.isBlank() || adresse.isBlank() || telephone.isBlank() ||
+            ville?.isBlank() == true || gouvernorat?.isBlank() == true
+        ) return ResponseEntity.badRequest()
+            .body(mapOf("message" to "Tous les champs sont obligatoires"))
+
+        if (!telephone.matches(Regex("^(\\+216)?[0-9 ]{8,12}$")))
+            return ResponseEntity.badRequest()
+                .body(mapOf("message" to "Numéro de téléphone invalide"))
+
+        // La position se change toujours en entier : latitude ET longitude
+        if ((lat == null) != (lng == null))
+            return ResponseEntity.badRequest()
+                .body(mapOf("message" to "La latitude et la longitude vont ensemble"))
+
+        // Tunisie : latitude ≈ 30–38, longitude ≈ 7–12
+        if (lat != null && lng != null && (lat !in 30.0..38.0 || lng !in 7.0..12.0))
+            return ResponseEntity.badRequest()
+                .body(mapOf("message" to "Position invalide : elle doit se trouver en Tunisie"))
+
+        if (pharmacieRepository.existsByNomIgnoreCaseAndAdresseIgnoreCaseAndIdNot(nom, adresse, id))
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(mapOf("message" to "Cette pharmacie existe déjà"))
+
+        pharmacie.nom = nom
+        pharmacie.adresse = adresse
+        pharmacie.telephone = telephone
+        if (ville != null) pharmacie.ville = ville
+        if (gouvernorat != null) pharmacie.gouvernorat = gouvernorat
+        if (lat != null && lng != null) {
+            pharmacie.latitude = lat
+            pharmacie.longitude = lng
+        }
+        return ResponseEntity.ok(pharmacieRepository.save(pharmacie))
+    }
+
+    @DeleteMapping("/admin/pharmacies/{id}")
+    fun delete(@PathVariable id: Long): ResponseEntity<Any> {
+        if (!pharmacieRepository.existsById(id))
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(mapOf("message" to "Pharmacie introuvable"))
+        pharmacieRepository.deleteById(id)
+        return ResponseEntity.noContent().build()
     }
 }
